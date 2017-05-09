@@ -28,6 +28,10 @@ AlsaStream::AlsaStream()
 	ptr_shm = NULL;
 	fd_shm = -1;
 	freq = 440;
+	format_bits = snd_pcm_format_width(SND_PCM_FORMAT_S16);
+	max_value = (1 << (format_bits -1)) - 1 ;
+	noise_type = 1;
+	play_sine = 0;
 }
 
 AlsaStream::~AlsaStream()
@@ -86,13 +90,21 @@ void AlsaStream::ShmInit()
 
 }
 
+void AlsaPlayback::PlayNoise()
+{
+	if(noise_type){
+		PlayUsualNoiseOrSine();
+	} else {
+		PlayVoiceLikeNoise();
+	}
+}
+
 void AlsaPlayback::GenerateNoise()
 {
 	int i;
 	ptr_shm = base_shm;
 	for (i = 0;i < period_size;i++){
-		ptr_shm[i] = (short int)rand()%65535;
-	//	ptr_shm += sprintf(ptr_shm,"%c",rand()%255);
+		ptr_shm[i] = (short int)rand()%max_value;
 	}
 }
 
@@ -103,8 +115,6 @@ void AlsaPlayback::GenerateSine(double *_phase)
 	double phase = *_phase;
 	double max_phase = 2. * M_PI;
 	double step = ((max_phase) * freq) / (double)rate; 
-	int format_bits = snd_pcm_format_width(SND_PCM_FORMAT_S16);
-	unsigned int max_value = (1 << (format_bits -1)) - 1 ;
 	int bps = format_bits / 8;
 	int res;
 	ptr_shm = base_shm;
@@ -119,8 +129,15 @@ void AlsaPlayback::GenerateSine(double *_phase)
 	*_phase = phase;
 }
 
+void AlsaPlayback::PlaySine()
+{
+	play_sine = 1;
+	PlayUsualNoiseOrSine();
+	play_sine = 0;
+}
 
-void AlsaPlayback::PlayUsualNoise()
+
+void AlsaPlayback::PlayUsualNoiseOrSine()
 {
 	/* number of playback cycles */
 	int loops;
@@ -141,6 +158,7 @@ void AlsaPlayback::PlayUsualNoise()
 	loops_ps = 1000000 / period_time;
 	while (loops > 0){
 		loops--;
+		//canvas -> ClearCanvas();
 		if( (!(loops % loops_ps)) && (loops != 0)){
 			if (progress_bar != NULL){
 				progress_bar -> CheckForIncrease(counter);
@@ -158,9 +176,12 @@ void AlsaPlayback::PlayUsualNoise()
 		}
 		*/
 		//ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
-		//GenerateNoise();
-		GenerateSine(&phase);
-		canvas -> PlotArray(base_shm);
+		if (!(play_sine)){
+			GenerateNoise();
+		} else {
+			GenerateSine(&phase);
+		}
+		//canvas -> PlotArray(base_shm);
 		ret_code = snd_pcm_writei(pcm_handle,base_shm,frames);
 		
 		if (ret_code == -EPIPE){
@@ -170,7 +191,7 @@ void AlsaPlayback::PlayUsualNoise()
 		} else if (ret_code != (int)frames){
 			fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
 		}
-		canvas -> ClearCanvas();
+		//canvas -> ClearCanvas();
 	}
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
@@ -287,22 +308,18 @@ void  AlsaPlayback::PlayVoiceLikeNoise()
 void AlsaCapture::CaptureVoice()
 {
 
+	int i;
+	int tmp;
+	int tmp2;
+	int tmp3;
 	/* number of capture cycles */
 	int loops;
 	/* number of capture cycles per second */
 	int loops_ps;
-	int i;
 	/* file for raw capture data */
 	FILE *voice_file;
-	/* file for voice-like noise data */
-	FILE *voice_like_noise_file;
 	voice_file = fopen("voice_file.raw","w");
 	if (voice_file == NULL){
-		fprintf(stderr,"Unable to open file: %s\n",strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	voice_like_noise_file = fopen("voice_like_noise_file.raw","w");
-	if (voice_like_noise_file == NULL){
 		fprintf(stderr,"Unable to open file: %s\n",strerror(errno));
 		exit(EXIT_FAILURE);
 	}
@@ -312,6 +329,7 @@ void AlsaCapture::CaptureVoice()
 		exit(EXIT_SUCCESS);
 	}
 	set_hw_params();
+	srand(time(NULL));
 	loops = time_us / period_time; 
 	loops_ps = 1000000 / period_time;
 	while (loops > 0){
@@ -333,17 +351,28 @@ void AlsaCapture::CaptureVoice()
 		} else if (ret_code != (int)frames){
 			fprintf(stderr,"Short read, must be read: %i, read only: %i\n",(int)frames,ret_code);
 		}
-		/* use playback_buffer for storing voice-like noise data */
-		for (i = 0;i < frames;i++){
-			playback_buffer[i] = capture_buffer[rand()%frames]; 
+		/* write voice-like noise to sharad memory */
+		ptr_shm = base_shm;
+		for (i = 0;i < period_size;i++){
+			tmp = rand()%period_size;
+			if ((capture_buffer[tmp] < max_value - 1500) ||
+			     capture_buffer[tmp] > -1 * max_value + 1500){
+				tmp2 = rand()%1500;	 
+				if(capture_buffer[tmp] > 0){
+					tmp3 = capture_buffer[tmp] - tmp2;
+				} else {
+					tmp3 = capture_buffer[tmp] + tmp2;
+				}
+			} else {
+				tmp3 = capture_buffer[tmp];
+			}
+			ptr_shm[i] = tmp3;
 		}
-		fwrite(playback_buffer,1,period_size,voice_like_noise_file);
 		fwrite(capture_buffer,1,period_size,voice_file);
 	}
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
 	fclose(voice_file);
-	fclose(voice_like_noise_file);
 	free(playback_buffer);
 	free(capture_buffer);
 }

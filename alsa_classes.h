@@ -31,8 +31,14 @@ class AlsaStream{
 		int ret_code;/* returned code for alsa api*/
 		unsigned int period_time;/* time for alsa period in microseconds */
 		int period_size;/* size of one period in bytes */
+		int format_bits;/* bits in ALSA format */
+		unsigned int max_value;/* max value correspond to ALSA format */
 		int counter;/* seconds counter */
 		int freq;/* sine frequency */
+		int noise_type;/* type of noise for playback. 
+						   Usual noise is 1, Voice-like noise is 0 
+						 */
+		int play_sine;/* 1 - sine is playing, 0 - sine is not playing */
 		TimePanel *time_panel;/* for recording */
 		ProgressBar *progress_bar;/* for playback */
 		Canvas *canvas;/* for plotting */
@@ -59,14 +65,18 @@ class AlsaStream{
 };
 
 class AlsaPlayback: public AlsaStream{
-	public:
-		void SetPlaybackTime(int t){time_us = t * 1000000;}/* set playback time in seconds */
-		void SetSineFreq(int f){ freq = f; }
-		void PlayUsualNoise();/* playback of rand noise */
-		void PlayVoiceLikeNoise();/* playback of noise similar to recorded voice */
-		void PlayVoice();/* playbak of vioce just recorded */
+	protected:
+		void PlayUsualNoiseOrSine();
 		void GenerateNoise();/* generate random data and write to shared memory */
 		void GenerateSine(double *_phase);/* generate sine with certain frequency */
+		void PlayVoiceLikeNoise();/* playback of noise similar to recorded voice */
+	public:
+		void SetNoiseType(bool n_type){ noise_type = n_type; }
+		void PlayNoise();/* play noise according to the type */
+		void SetPlaybackTime(int t){time_us = t * 1000000;}/* set playback time in seconds */
+		void SetSineFreq(int f){ freq = f; }
+		void PlaySine();/* sinewave playback */
+		void PlayVoice();/* playbak of vioce just recorded */
 };
 
 class AlsaCapture: public AlsaStream{

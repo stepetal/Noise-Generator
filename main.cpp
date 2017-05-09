@@ -7,6 +7,10 @@
 #include "x11_classes.h"
 #include "alsa_classes.h"
 
+/* constants for playback and capture */
+#define USUAL_NOISE						1
+#define VOICE_LIKE_NOISE				0
+
 /* constants for MainWindow */
 #define MAIN_WINDOW_NUMBER				3	/* number of MainWindows */
 #define MAIN_WINDOW_WIDTH				650
@@ -84,7 +88,6 @@ int main(int argc,char *argv[])
 	int time_array[3] = {5,10,20};/* available recording and playback time */
 	/* options for sound processing */
 	bool time_domain = true;
-	bool usual = true;
 	int sine_freq = freq_array[3];
 	int time = time_array[1];
 	/* temp data for canvas */
@@ -446,6 +449,7 @@ int main(int argc,char *argv[])
 	//apb -> SetTimerValue(time);
 	//acp -> SetTimerValue(time);
 	//apb -> SetProgressBar(progress_bar_array[0]);
+	apb -> SetSineFreq(sine_freq);
 	apb -> SetTimePanel(time_panel_array[1]);
 	apb -> ShmInit();
 	acp -> ShmInit();
@@ -524,6 +528,7 @@ int main(int argc,char *argv[])
 						edit_box_array[i] -> Draw();
 						sine_freq = atoi(edit_box_array[i] -> GetText());
 						fprintf(stderr,"Frequency is: %i\n",sine_freq);
+						apb -> SetSineFreq(sine_freq);
 
 					}
 					if (event.xkey.keycode != 36 && 
@@ -566,14 +571,14 @@ int main(int argc,char *argv[])
 							if (i == 2){
 								check_box_array[2] -> Check();
 								check_box_array[3] -> Uncheck();
-								usual = true;
 								fprintf(stderr,"Usual noise\n");
+								apb -> SetNoiseType(USUAL_NOISE);
 							}
 							if (i == 3){
 								check_box_array[2] -> Uncheck();
 								check_box_array[3] -> Check();
-								usual = false;
 								fprintf(stderr,"Voice-like noise\n");
+								apb -> SetNoiseType(VOICE_LIKE_NOISE);
 							}
 						}
 						if (i == 4 || i == 5 || i == 6 || i == 7){
@@ -684,16 +689,17 @@ int main(int argc,char *argv[])
 					//counter++;
 					main_window_array[2] -> ShowWindow();
 					time_panel_array[1] -> Start();
-					apb -> PlayUsualNoise();
+					apb -> PlayNoise();
 				}
 				if (event.xbutton.window == button_array[8] -> GetWindow()){
 					apb -> PlayVoice();
 				}
 				if (event.xbutton.window == button_array[1] -> GetWindow()){
-					progress_bar_array[0] -> ResetBar();
-					progress_bar_array[0] -> Draw();
-					apb -> ResetTimer();
+					//progress_bar_array[0] -> ResetBar();
+					//progress_bar_array[0] -> Draw();
+					//apb -> ResetTimer();
 					//counter = 1;
+					apb -> PlaySine();
 				}
 				if (event.xbutton.window == button_array[9] -> GetWindow()){
 					
