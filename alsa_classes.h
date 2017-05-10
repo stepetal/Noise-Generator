@@ -13,6 +13,9 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <math.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <unistd.h>
 //#include "x11_classes.h"/* for compilation with noise_gen program */
 
 
@@ -47,10 +50,16 @@ class AlsaStream{
 		int fd_shm;/* file descriptor of shared memory */
 		short int *base_shm;/* start of shared memory */
 		short int *ptr_shm;/* copy of the base_shm */
-
+		int loops;/* number of playback/capture cycles */
+		int loops_copy;
+		/* for multithreading */
+		sem_t full,empty,mutex_sem;
+		pthread_mutex_t mutex;
 		/* methods */
 		void set_hw_params();/* setting hardware parameters for audio */
 	public:
+		AlsaStream();
+		~AlsaStream();
 		void SetTimerValue(int cnt){counter = cnt;}/* for using this value at least two
 													   threads are needed and they must
 													   be synchronized 
@@ -60,8 +69,8 @@ class AlsaStream{
 		void SetProgressBar(ProgressBar *prb){ progress_bar = prb; }
 		void SetCanvas(Canvas *cnv){ canvas = cnv; }
 		void ShmInit();/* initializing of shm */
-		AlsaStream();
-		~AlsaStream();
+		/* for multithreading */
+		void SemaphoresInit();/* Initializing of semaphores */
 };
 
 class AlsaPlayback: public AlsaStream{
@@ -77,6 +86,10 @@ class AlsaPlayback: public AlsaStream{
 		void SetSineFreq(int f){ freq = f; }
 		void PlaySine();/* sinewave playback */
 		void PlayVoice();/* playbak of vioce just recorded */
+		/* for multithreading */
+		static void *ProducerWrite(void *params);/* producer write thread routine */
+		static void *ConsumerRead(void *params);/* consumer read thread routine */
+		void PlotNoise();/* plot noise on canvas */
 };
 
 class AlsaCapture: public AlsaStream{
@@ -85,4 +98,6 @@ class AlsaCapture: public AlsaStream{
 		void CaptureVoice();/* capture voice from microphone */	
 };
 
-
+struct thread_struct{
+	AlsaPlayback *apb_s;
+};

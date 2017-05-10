@@ -68,6 +68,7 @@ int screen_number;
 void CreateDisplay()
 {
 	
+	XInitThreads();
 	display = XOpenDisplay(NULL);
 	if (display == NULL){
 		fprintf(stderr,"Unable to open the display\n");
@@ -78,6 +79,7 @@ void CreateDisplay()
 int main(int argc,char *argv[])
 {
 	int i,j;
+	int status;/* for error status */
 	char ch;/* char form keyboard */
 	KeySym key_sym;/* KeySym for key */
 	bool done = false;/* condition for ending cycle */
@@ -96,6 +98,9 @@ int main(int argc,char *argv[])
 	/* alsa data for plotting */
 	int frames = 128 * 2;/* 2 bytes per one frame */
 	int frame_length = 32765;/* max value for short int */
+	/* for multithreading */
+	pthread_t t1,t2;
+	thread_struct *t_struct;
 
 	/* options for windows*/
 	unsigned int main_window_width;/* for manual changing of main window width */
@@ -460,6 +465,10 @@ int main(int argc,char *argv[])
 	apb -> SetPlaybackTime(time);
 	acp -> ResetTimer();
 	apb -> ResetTimer();
+	apb -> SemaphoresInit();
+	/* Allocate memory for multithreading */
+	t_struct = (thread_struct *)malloc(sizeof(struct thread_struct));
+	t_struct -> apb_s = apb;
 	while(!done){
 		XNextEvent(main_window_array[0] -> GetDisplay(),&event);
 		switch(event.type){
@@ -689,7 +698,27 @@ int main(int argc,char *argv[])
 					//counter++;
 					main_window_array[2] -> ShowWindow();
 					time_panel_array[1] -> Start();
-					apb -> PlayNoise();
+					status = pthread_create(&t1,NULL,apb -> ProducerWrite,t_struct);
+					if (status != 0){
+						fprintf(stderr,"Crate producer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_create(&t2,NULL,apb -> ConsumerRead,t_struct);
+					if (status != 0){
+						fprintf(stderr,"Crate consumer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_join(t1,NULL);
+					if (status != 0){
+						fprintf(stderr,"Join to producer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_join(t2,NULL);
+					if (status != 0){
+						fprintf(stderr,"Join to consumer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					//apb -> PlayNoise();
 				}
 				if (event.xbutton.window == button_array[8] -> GetWindow()){
 					apb -> PlayVoice();
@@ -699,7 +728,28 @@ int main(int argc,char *argv[])
 					//progress_bar_array[0] -> Draw();
 					//apb -> ResetTimer();
 					//counter = 1;
-					apb -> PlaySine();
+					main_window_array[2] -> ShowWindow();
+					status = pthread_create(&t1,NULL,apb -> ProducerWrite,t_struct);
+					if (status != 0){
+						fprintf(stderr,"Crate producer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_create(&t2,NULL,apb -> ConsumerRead,t_struct);
+					if (status != 0){
+						fprintf(stderr,"Crate consumer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_join(t1,NULL);
+					if (status != 0){
+						fprintf(stderr,"Join to producer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					status = pthread_join(t2,NULL);
+					if (status != 0){
+						fprintf(stderr,"Join to consumer thread error: %s\n",strerror(status));
+						exit(EXIT_FAILURE);
+					}
+					//apb -> PlaySine();
 				}
 				if (event.xbutton.window == button_array[9] -> GetWindow()){
 					
@@ -824,6 +874,7 @@ int main(int argc,char *argv[])
 	}
 	delete acp;
 	delete apb;
+	free(t_struct);
 	XCloseDisplay(display);
 	return 0;
 }

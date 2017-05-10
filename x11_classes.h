@@ -48,6 +48,7 @@ class AbstractWindow{
 						  Window parent_p,unsigned int border_width_p,
 						  Display *display_p,int screen_number_p);/* create window */
 		Window GetWindow(){ return cur_window; }
+		Display *GetDisplay(){ return display; }
 		unsigned int GetWidth(){ return width; }
 		unsigned int GetHeight(){ return height; }
 		void ShowWindow();/* make window visible */

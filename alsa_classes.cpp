@@ -27,6 +27,7 @@ AlsaStream::AlsaStream()
 	base_shm = NULL;
 	ptr_shm = NULL;
 	fd_shm = -1;
+	loops = 0;
 	freq = 440;
 	format_bits = snd_pcm_format_width(SND_PCM_FORMAT_S16);
 	max_value = (1 << (format_bits -1)) - 1 ;
@@ -87,8 +88,70 @@ void AlsaStream::ShmInit()
 		fprintf(stderr,"Map failed: %s\n",strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+}
+
+void AlsaStream::SemaphoresInit()
+{
+	pthread_mutex_init(&mutex,NULL);
+	sem_init(&full,0,0);
+	sem_init(&empty,0,period_size);
+	sem_init(&mutex_sem,0,1);
+}
+/* methods of AlsaPlayback class */
+
+void *AlsaPlayback::ConsumerRead(void *params)
+{
+	fprintf(stderr,"From consumer thread start procedure\n");
+	thread_struct *t_struct_c = (thread_struct *)params;
+	t_struct_c -> apb_s -> PlotNoise();
+	fprintf(stderr,"Noise has been plotted\n");
+}
+
+
+void AlsaPlayback::PlotNoise()
+{
+	int i;
+	int tmp;
+	int loops_c;
+	short int *ptr_thread;
+	int sem_val1;
+	int sem_val2;
+	loops_c = time_us / period_size;
+	//fprintf(stderr,"time_us: %i\n",time_us);
+	//fprintf(stderr,"period_size: %i\n",period_size);
+	//fprintf(stderr,"loops_c: %i\n",loops_c);
+	while (loops_c){
+		loops_c--;
+		//	sem_getvalue(&full,&sem_val1);
+		//	fprintf(stderr,"full cons : %i\n",sem_val1);
+		//	sem_getvalue(&empty,&sem_val2);
+		//	fprintf(stderr,"empty cons: %i\n",sem_val2);
+		sem_wait(&full);
+		//sem_wait(&mutex_sem);
+		pthread_mutex_lock(&mutex);
+		if(loops_c % 3  == 0){
+		XLockDisplay(canvas -> GetDisplay());
+		canvas -> ClearCanvas();
+		ptr_thread = base_shm;
+		canvas -> PlotArray(ptr_thread);
+		XUnlockDisplay(canvas -> GetDisplay());
+		}
+		//fprintf(stderr,"Plotting...\n");
+		//sem_post(&mutex_sem);
+		pthread_mutex_unlock(&mutex);
+		sem_post(&empty);
+	}
 
 }
+
+void *AlsaPlayback::ProducerWrite(void *params)
+{
+	fprintf(stderr,"From producer thread start procedure\n");
+	thread_struct *t_struct_p = (thread_struct *)params;
+	t_struct_p -> apb_s -> PlayNoise();
+	fprintf(stderr,"Noise has been generated\n");
+}
+
 
 void AlsaPlayback::PlayNoise()
 {
@@ -104,7 +167,8 @@ void AlsaPlayback::GenerateNoise()
 	int i;
 	ptr_shm = base_shm;
 	for (i = 0;i < period_size;i++){
-		ptr_shm[i] = (short int)rand()%max_value;
+		ptr_shm[i] = (short int)rand() % max_value;
+		playback_buffer[i] = ptr_shm[i];
 	}
 }
 
@@ -132,20 +196,20 @@ void AlsaPlayback::GenerateSine(double *_phase)
 void AlsaPlayback::PlaySine()
 {
 	play_sine = 1;
-	PlayUsualNoiseOrSine();
-	play_sine = 0;
 }
 
 
 void AlsaPlayback::PlayUsualNoiseOrSine()
 {
-	/* number of playback cycles */
-	int loops;
+	pid_t pid;
+	int return_status;
 	int i;
 	/* number of playback cycles per second */
 	int loops_ps;
 	/* for sinewave generator */
 	double phase = 0;
+	/* for semaphores */
+	int sem_val1,sem_val2;
 	/* open default pcm device for playback */
 	ret_code = snd_pcm_open(&pcm_handle,"default",SND_PCM_STREAM_PLAYBACK,0);
 	srand(time(NULL));
@@ -156,20 +220,11 @@ void AlsaPlayback::PlayUsualNoiseOrSine()
 	set_hw_params();
 	loops = time_us / period_time;
 	loops_ps = 1000000 / period_time;
+	loops_copy = loops;
 	while (loops > 0){
 		loops--;
 		//canvas -> ClearCanvas();
-		if( (!(loops % loops_ps)) && (loops != 0)){
-			if (progress_bar != NULL){
-				progress_bar -> CheckForIncrease(counter);
-				progress_bar -> Draw();
-			}
-			if (time_panel != NULL){
-				time_panel -> RenewCounter(counter);	
-				time_panel -> Draw();
-				(counter)++;
-			}
-		}
+		
 		/*
 		for (i = 0;i < period_size;i++){
 			playback_buffer[i] = rand()%65535;
@@ -177,22 +232,51 @@ void AlsaPlayback::PlayUsualNoiseOrSine()
 		*/
 		//ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
 		if (!(play_sine)){
+			sem_wait(&empty);
+		//	sem_wait(&mutex_sem);
+			pthread_mutex_lock(&mutex);
+			if( (!(loops % loops_ps)) && (loops != 0)){
+				if (progress_bar != NULL){
+					progress_bar -> CheckForIncrease(counter);
+					progress_bar -> Draw();
+				}
+				if (time_panel != NULL){
+					time_panel -> RenewCounter(counter);	
+					time_panel -> Draw();
+					(counter)++;
+				}
+			}
 			GenerateNoise();
+			pthread_mutex_unlock(&mutex);
+		//	sem_post(&mutex_sem);
+			sem_post(&full);
+			//fprintf(stderr,"Loop : %i\n",loops);
+			//sem_getvalue(&full,&sem_val1);
+			//fprintf(stderr,"full : %i\n",sem_val1);
+			//sem_getvalue(&empty,&sem_val2);
+			//fprintf(stderr,"empty : %i\n",sem_val2);
+			ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
+		
+			if (ret_code == -EPIPE){
+				snd_pcm_prepare(pcm_handle);
+			} else if (ret_code < 0){
+				fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
+			} else if (ret_code != (int)frames){
+				fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
+			}
 		} else {
+			sem_wait(&empty);
+			pthread_mutex_lock(&mutex);
 			GenerateSine(&phase);
+			pthread_mutex_unlock(&mutex);
+			sem_post(&full);
 		}
 		//canvas -> PlotArray(base_shm);
-		ret_code = snd_pcm_writei(pcm_handle,base_shm,frames);
-		
-		if (ret_code == -EPIPE){
-			snd_pcm_prepare(pcm_handle);
-		} else if (ret_code < 0){
-			fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
-		} else if (ret_code != (int)frames){
-			fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
-		}
 		//canvas -> ClearCanvas();
 	}
+	if (play_sine)
+		play_sine = 0;
+	sem_post(&full);
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
 	free(playback_buffer);
@@ -202,8 +286,6 @@ void AlsaPlayback::PlayUsualNoiseOrSine()
 
 void AlsaPlayback::PlayVoice()
 {
-	/* number of playback cycles */	
-	int loops;
 	int i;
 	/* number of playback cycles per second */
 	int loops_ps;
@@ -253,20 +335,11 @@ void AlsaPlayback::PlayVoice()
 
 void  AlsaPlayback::PlayVoiceLikeNoise()
 {
-	/* number of playback cycles */	
-	int loops;
 	int i;
 	/* number of playback cycles per second */
 	int loops_ps;
 	/* offset for file */
 	long offset;
-	/* file with voice-like noise */
-	FILE *voice_like_noise_file;
-	voice_like_noise_file = fopen("voice_like_noise_file.raw","r");
-	if (voice_like_noise_file == NULL){
-		fprintf(stderr,"Unable to open file: %s\n",strerror(errno));
-		exit(EXIT_FAILURE);
-	}
 	ret_code = snd_pcm_open(&pcm_handle,"default",SND_PCM_STREAM_PLAYBACK,0);
 	if (ret_code < 0){
 		fprintf(stderr,"Unable to open pcm device: %s\n",snd_strerror(ret_code));
@@ -277,27 +350,21 @@ void  AlsaPlayback::PlayVoiceLikeNoise()
 	loops_ps = 1000000 / period_time;
 	while (loops > 0){
 		loops--;
-		
 		if( (!(loops % loops_ps)) && (loops != 0)){
 			(counter)++;
 		}
-		
-		if(!feof(voice_like_noise_file)){
-			fread(playback_buffer,1,period_size,voice_like_noise_file);
-			ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
-			if (ret_code == -EPIPE){
-				snd_pcm_prepare(pcm_handle);
-			} else if (ret_code < 0){
-				fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
-			} else if (ret_code != (int)frames){
-				fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
-			}
+		ptr_shm = base_shm;
+		ret_code = snd_pcm_writei(pcm_handle,ptr_shm,frames);
+		if (ret_code == -EPIPE){
+			snd_pcm_prepare(pcm_handle);
+		} else if (ret_code < 0){
+			fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
+		} else if (ret_code != (int)frames){
+			fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
 		}
-
 	}
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
-	fclose(voice_like_noise_file);
 	free(playback_buffer);
 	free(capture_buffer);
 	sleep(5);/* delay before next sound playback */
@@ -312,8 +379,6 @@ void AlsaCapture::CaptureVoice()
 	int tmp;
 	int tmp2;
 	int tmp3;
-	/* number of capture cycles */
-	int loops;
 	/* number of capture cycles per second */
 	int loops_ps;
 	/* file for raw capture data */
