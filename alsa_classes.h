@@ -78,12 +78,15 @@ class AlsaPlayback: public AlsaStream{
 		void GenerateNoise();/* generate random data and write to shared memory */
 		void GenerateSine(double *_phase);/* generate sine with certain frequency */
 		void PlayVoiceLikeNoise();/* playback of noise similar to recorded voice */
+		void GenerateVoiceLikeNoise();/* get voice-like noise data */
+
 	public:
-		void SetNoiseType(bool n_type){ noise_type = n_type; }
+		void SetNoiseType(int n_type){ noise_type = n_type; }
+		int GetNoiseType(){ return noise_type; }
 		void PlayNoise();/* play noise according to the type */
 		void SetPlaybackTime(int t){time_us = t * 1000000;}/* set playback time in seconds */
 		void SetSineFreq(int f){ freq = f; }
-		void PlaySine();/* sinewave playback */
+		void PlaySine();/* sinewave playback setting */
 		void PlayVoice();/* playbak of vioce just recorded */
 		/* for multithreading */
 		static void *ProducerWrite(void *params);/* producer write thread routine */

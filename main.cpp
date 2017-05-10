@@ -695,6 +695,7 @@ int main(int argc,char *argv[])
 					//time_panel_array[0] -> Draw();
 					//fprintf(stderr,"Counter = %i\n",counter);
 					//counter++;
+					fprintf(stderr,"Noise type: %i\n",apb -> GetNoiseType());
 					main_window_array[2] -> ShowWindow();
 					button_array[13] -> DrawText();
 					button_array[14] -> DrawText();
