@@ -19,6 +19,7 @@
 //#include "x11_classes.h"/* for compilation without noise_gen program */
 
 
+
 class AlsaStream{
 	protected:
 		/* variables */
@@ -41,6 +42,7 @@ class AlsaStream{
 		int noise_type;/* type of noise for playback. 
 						   Usual noise is 1, Voice-like noise is 0 
 						 */
+		int domain_type;/* 1 - time domain, 0 - frequency domain */
 		int play_sine;/* 1 - sine is playing, 0 - sine is not playing */
 		TimePanel *time_panel;/* for recording */
 		ProgressBar *progress_bar;/* for playback */
@@ -70,6 +72,7 @@ class AlsaStream{
 		void ShmInit();/* initializing of shm */
 		/* for multithreading */
 		void SemaphoresInit();/* Initializing of semaphores */
+
 };
 
 class AlsaPlayback: public AlsaStream{
@@ -82,6 +85,7 @@ class AlsaPlayback: public AlsaStream{
 
 	public:
 		void SetNoiseType(int n_type){ noise_type = n_type; }
+		void SetDomainType(int d_type){ domain_type = d_type;}
 		int GetNoiseType(){ return noise_type; }
 		void PlayNoise();/* play noise according to the type */
 		void SetPlaybackTime(int t){time_us = t * 1000000;}/* set playback time in seconds */

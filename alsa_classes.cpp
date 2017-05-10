@@ -32,6 +32,7 @@ AlsaStream::AlsaStream()
 	format_bits = snd_pcm_format_width(SND_PCM_FORMAT_S16);
 	max_value = (1 << (format_bits -1)) - 1 ;
 	noise_type = 1;
+	domain_type = 1;
 	play_sine = 0;
 }
 
@@ -121,7 +122,11 @@ void AlsaPlayback::PlotNoise()
 				XLockDisplay(canvas -> GetDisplay());/* preventive measures */
 				canvas -> ClearCanvas();
 				ptr_thread = base_shm;
-				canvas -> PlotArray(ptr_thread);
+				if( domain_type){
+					canvas -> PlotArray(ptr_thread);
+				} else {
+					canvas -> PlotArrayFFT(ptr_thread);
+				}
  				XUnlockDisplay(canvas -> GetDisplay());
 			}
 			pthread_mutex_unlock(&mutex);

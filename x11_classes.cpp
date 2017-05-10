@@ -572,4 +572,111 @@ void Canvas::ClearCanvas()
 	XClearWindow(display,cur_window);
 }
 
+float Canvas::FindTallestPeak(int offset,int count,fftw_real *cplx)
+{
+	int i;
+	int lenght = data_size;
+	fftw_real re,im,tmp,val = 0.0f;
+	for (i = 0;i < count; i++){
+		re = cplx[i + offset];
+		im = cplx[lenght - offset -i];
+		tmp = sqrt(re * re + im * im);
+		val = tmp > val ? tmp : val;
+	}
+	return (float)val;
+}
 
+void Canvas::FindFreqBandMagn(short int *array)
+{
+	float magn,tmp = 0.0f;
+	int bin,i,offset,count;
+	float base_freq_ratio;
+	fftw_real in[data_size];
+	fftw_real out[data_size];
+	rfftw_plan fft;
+	float prevtmp[NUMB_OF_FREQ_BANDS];
+	float hz_per_bin;
+	int bin_band[data_size];
+	for (i = 0;i < NUMB_OF_FREQ_BANDS;i++){
+		prevtmp[i] = 0.0;
+	}
+	fft = rfftw_create_plan(data_size,FFTW_FORWARD,FFTW_ESTIMATE);
+	hz_per_bin = (float)DATA_RATE / (float)data_size;
+//	fprintf(stderr,"Hz per bin: %f\n",hz_per_bin);
+	for (i = 0;i < NUMB_OF_FREQ_BANDS;i++){
+//		fprintf(stderr,"freq_bands[%d] = %f\n",i,freq_bands[i]);	
+	}
+	bin == 1;
+	while (bin <= freq_bands[0] / hz_per_bin){
+		bin_band[bin++] = 0;
+	}
+	for (i = 1;i < NUMB_OF_FREQ_BANDS - 1
+	           && bin < data_size/2 - 1
+			   && freq_bands[i + 1] < DATA_RATE / 2;i++){
+		base_freq_ratio = (freq_bands[i+1]) / hz_per_bin;
+		while (bin <= base_freq_ratio){
+			bin_band[bin++] = i;
+		}
+	}
+	for( ;bin < (data_size / 2);bin++){
+		bin_band[bin] = NUMB_OF_FREQ_BANDS - 1;
+	}
+	for (i = 0;i < data_size;i++){
+		in[i] = (fftw_real)array[i];
+	}
+	/* perform fft */
+	rfftw_one(fft,in,out);
+	/* find magnitudes */
+	bin = 1;
+	for (i = 0;i < NUMB_OF_FREQ_BANDS;i++){
+		count = 0;
+		offset = bin;
+		while (bin < (data_size / 2) && bin_band[bin] <= i){
+			count++;
+			bin++;
+		}
+		if(count){
+			magn = FindTallestPeak(offset,count,out);
+			tmp = magn > 0.0f ? logf(magn) * 16.7f : 0.0f;
+			tmp = tmp > 172.0f ? (tmp - 172.0f) * 3.2f : 0.0f;
+			/* Clip excessive levels */
+			tmp = tmp < 250.0f ? tmp : 250.0f;
+			/* Control rate of decay */
+			/* Establish special case */
+			prevtmp[i] = prevtmp[i] > 2.0f ?
+				prevtmp[i] - (2.0f * logf(prevtmp[i])) : 0.0f;
+			/* Now handle the general case */
+			if (tmp > prevtmp[i]){
+				prevtmp[i] = tmp;
+			} else {
+				tmp = prevtmp[i];
+			}
+			ddata[i].fband_magn = tmp;
+//			fprintf(stderr,"FREQ_BAND: %d,bin_count: %d,display_fband_magn: %.2f,raw_fband_magn %.2f, logf(raw_fband_magn): %.2f\n",
+//					i,count,ddata[i].fband_magn,magn,logf(magn));
+
+		}
+	}
+	rfftw_destroy_plan(fft);
+}
+
+void Canvas::PlotSpectrum()
+{
+	int i;
+	float new_x_unit;
+	float new_y_unit;
+	int ampl = 300;
+	new_x_unit = (float)width / (float)NUMB_OF_FREQ_BANDS;
+	new_y_unit = (float)height / (float)ampl;
+	for (i = 0;i < NUMB_OF_FREQ_BANDS;i++){
+		XFillRectangle(display,cur_window,wind_gc,
+					   (int)(i * new_x_unit),(int)(height - new_y_unit * ddata[i].fband_magn),
+					   (unsigned int )new_x_unit - 2,(unsigned int)new_y_unit * ddata[i].fband_magn);
+	}
+}
+
+void Canvas::PlotArrayFFT(short int *array)
+{
+	FindFreqBandMagn(array);
+	PlotSpectrum();
+}

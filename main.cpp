@@ -10,6 +10,8 @@
 /* constants for playback and capture */
 #define USUAL_NOISE						1
 #define VOICE_LIKE_NOISE				0
+#define TIME_DOMAIN						1
+#define FREQUENCY_DOMAIN				0
 
 /* constants for MainWindow */
 #define MAIN_WINDOW_NUMBER				3	/* number of MainWindows */
@@ -566,12 +568,14 @@ int main(int argc,char *argv[])
 								check_box_array[1] -> Uncheck();
 							 	time_domain = false;
 								fprintf(stderr,"FrequencyDomain\n");
+								apb -> SetDomainType(FREQUENCY_DOMAIN);
 							}
 							if(i == 1){
 								check_box_array[0] -> Uncheck();
 								check_box_array[1] -> Check();
 								time_domain = true;
 								fprintf(stderr,"TimeDomain\n");
+								apb -> SetDomainType(TIME_DOMAIN);
 							}
 						}
 						fprintf(stderr,"i = %i\n",i);

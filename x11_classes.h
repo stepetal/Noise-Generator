@@ -10,6 +10,12 @@
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <math.h>
+#include <fftw.h>
+#include <rfftw.h>
+
+#define NUMB_OF_FREQ_BANDS	15
+#define DATA_RATE			44100
 
 class AbstractWindow{
 	protected:
@@ -193,11 +199,26 @@ class Canvas : public AbstractWindow{
 		int max_y_value;/* maximum y value from measure */
 		float x_unit;/* one x - unit relative to canvas */
 		float y_unit;/* one y - unit relative to canvas */
+		/* for frequency spectrum */
+		struct fband_data{
+			float fband_magn;
+		};
+		struct fband_data ddata[NUMB_OF_FREQ_BANDS];
+		float freq_bands[NUMB_OF_FREQ_BANDS] = 
+		{
+			50.00f, 100.00f, 155.56f, 220.0f, 311.13f,
+			440.00f, 622.25f, 880.00f, 1244.51f, 1760.00f,
+			2489.02f, 3519.95f, 4978.04f, 9956.08f, 19912.16f
+		};
 	protected:
 		void SetMaxYValueMeasure(int val){ max_y_value = val; }
 		void CalculateCoordUnits();/* find x_unit and y_unit */
 		void DrawPoints();/* plotting of data array */
 		void DrawPoint(int x,int y);/* draw point coordinates relative to canvas */
+		/* for FFT */
+		float FindTallestPeak(int offset,int count,fftw_real *cplx);/* find tallest peak in band */
+		void FindFreqBandMagn(short int *array);/* find magnitude of frequency fand data */
+		void PlotSpectrum();/* plot frequency spectrum of data */
 	public:
 		Canvas(unsigned int width_p,unsigned int height_p,
 			   int x_p,int y_p,char const *color_str_p,
@@ -209,6 +230,7 @@ class Canvas : public AbstractWindow{
 														 and top bound of data 
 													   */
 		void PlotArray(short int *array);/* plot array with measure y-values */
+		void PlotArrayFFT(short int *array);/* plot frequency spectrum of array */
 		void SetDataColor(char const *col){ data_color = col; }
 		void ClearCanvas();
 };
