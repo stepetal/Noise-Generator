@@ -16,7 +16,7 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <unistd.h>
-//#include "x11_classes.h"/* for compilation with noise_gen program */
+//#include "x11_classes.h"/* for compilation without noise_gen program */
 
 
 class AlsaStream{
@@ -45,25 +45,24 @@ class AlsaStream{
 		TimePanel *time_panel;/* for recording */
 		ProgressBar *progress_bar;/* for playback */
 		Canvas *canvas;/* for plotting */
+		Button *button_reset;/* for drawing text on reset button */
+		Button *button_close;/* for drawing text on close button */
 		char const *name_shm;/* name of shared memory */
 		int size_shm;/* size of shared memory */
 		int fd_shm;/* file descriptor of shared memory */
 		short int *base_shm;/* start of shared memory */
 		short int *ptr_shm;/* copy of the base_shm */
 		int loops;/* number of playback/capture cycles */
-		int loops_copy;
 		/* for multithreading */
-		sem_t full,empty,mutex_sem;
+		sem_t full,empty;
 		pthread_mutex_t mutex;
 		/* methods */
 		void set_hw_params();/* setting hardware parameters for audio */
 	public:
 		AlsaStream();
 		~AlsaStream();
-		void SetTimerValue(int cnt){counter = cnt;}/* for using this value at least two
-													   threads are needed and they must
-													   be synchronized 
-													 */	
+		void SetCloseButton(Button *btn_c){button_close = btn_c; }
+		void SetResetButton(Button *btn_r){button_reset = btn_r; }
 		void ResetTimer(){ counter = 1;}
 		void SetTimePanel(TimePanel *tp){ time_panel = tp; }
 		void SetProgressBar(ProgressBar *prb){ progress_bar = prb; }

@@ -92,9 +92,6 @@ int main(int argc,char *argv[])
 	bool time_domain = true;
 	int sine_freq = freq_array[3];
 	int time = time_array[1];
-	/* temp data for canvas */
-	int data[10] = {150,140,130,20,50,171,183,139,43,100};
-	int data_length = 10;
 	/* alsa data for plotting */
 	int frames = 128 * 2;/* 2 bytes per one frame */
 	int frame_length = 32765;/* max value for short int */
@@ -165,7 +162,7 @@ int main(int argc,char *argv[])
 											  "Start","OK","OK","Done","Play",
 											  "Reset","Quit","About","Close","Close","Reset"};
 	int button_x_value = 40;
-	int button_y_array[BUTTON_NUMBER] = {90,120,30,35,25,105,105,10,35,50,5,5,170,10,50};
+	int button_y_array[BUTTON_NUMBER] = {90,120,30,35,25,105,105,10,35,50,5,5,170,10,385};
 	Window button_parent[BUTTON_NUMBER];
 	/* for MainWindows */
 	int main_window_x_array[MAIN_WINDOW_NUMBER] = {50,100,150};
@@ -176,11 +173,11 @@ int main(int argc,char *argv[])
 	int edit_box_y_array[EDIT_BOX_NUMBER] = {20};
 	Window edit_box_parent[EDIT_BOX_NUMBER];
 	/* for ProgressBar */
-	int progress_bar_x_array[PROGRESS_BAR_NUMBER] = {150};
+	int progress_bar_x_array[PROGRESS_BAR_NUMBER] = {250};
 	int progress_bar_y_array[PROGRESS_BAR_NUMBER] = {370};
 	Window progress_bar_parent[PROGRESS_BAR_NUMBER];
 	/* for TimePanel */
-	int time_panel_x_array[TIME_PANEL_NUMBER] = {90,50};
+	int time_panel_x_array[TIME_PANEL_NUMBER] = {90,125};
 	int time_panel_y_array[TIME_PANEL_NUMBER] = {20,370};
 	Window time_panel_parent[TIME_PANEL_NUMBER];
 	/* for Canvas */
@@ -309,7 +306,10 @@ int main(int argc,char *argv[])
 	button_parent[14] = main_window_array[2] -> GetWindow();
 
 	for (i = 0;i < BUTTON_NUMBER;i++){
-		if (i == 13 || i == 14){
+		if (i == 14){
+			button_x_value = 50;
+		}
+		if (i == 13){
 			button_x_value = 10;
 		}
 		if (i == 12){
@@ -451,23 +451,26 @@ int main(int argc,char *argv[])
 	/* Creating capture and playback objects */
 	apb = new AlsaPlayback();
 	acp = new AlsaCapture();
-	//apb -> SetTimerValue(time);
-	//acp -> SetTimerValue(time);
-	//apb -> SetProgressBar(progress_bar_array[0]);
+	/* Set parameters for playback */
+	apb -> SetProgressBar(progress_bar_array[0]);
 	apb -> SetSineFreq(sine_freq);
 	apb -> SetTimePanel(time_panel_array[1]);
 	apb -> ShmInit();
-	acp -> ShmInit();
-	acp -> SetTimePanel(time_panel_array[0]);
 	apb -> SetCanvas(canvas_array[0]);
-	acp -> SetCanvas(canvas_array[0]);
-	acp -> SetCaptureTime(time);
 	apb -> SetPlaybackTime(time);
-	acp -> ResetTimer();
 	apb -> ResetTimer();
 	apb -> SemaphoresInit();
+	apb -> SetResetButton(button_array[14]);
+	apb -> SetCloseButton(button_array[13]);
+	/* Set parameters for capture */
+	acp -> SetTimePanel(time_panel_array[0]);
+	acp -> ShmInit();
+	acp -> SetCanvas(canvas_array[0]);
+	acp -> SetCaptureTime(time);
+	acp -> ResetTimer();
 	/* Allocate memory for multithreading */
 	t_struct = (thread_struct *)malloc(sizeof(struct thread_struct));
+	/* Set member of thread_struct */
 	t_struct -> apb_s = apb;
 	while(!done){
 		XNextEvent(main_window_array[0] -> GetDisplay(),&event);
@@ -476,11 +479,6 @@ int main(int argc,char *argv[])
 				for (i = 0;i < MAIN_WINDOW_NUMBER;i++){
 					main_window_array[i] -> DrawText(text);
 				}
-				/*
-				for (i = 0;i < CANVAS_NUMBER;i++){
-					canvas_array[i] -> PlotArray(data);
-				}
-				*/
 				for (i = 0;i < BUTTON_NUMBER;i++){
 					button_array[i] -> ButtonReleasedState();
 					button_array[i] -> DrawText();
@@ -529,7 +527,8 @@ int main(int argc,char *argv[])
 				break;
 			case KeyPress:
 				if (event.xkey.keycode == 9){
-					done = true;
+					main_window_array[1] -> HideWindow();
+					main_window_array[2] -> HideWindow();
 				}
 				for (i = 0;i < EDIT_BOX_NUMBER;i++){
 					if ((event.xkey.keycode == 36) && edit_box_array[i] -> GetState()){
@@ -697,7 +696,11 @@ int main(int argc,char *argv[])
 					//fprintf(stderr,"Counter = %i\n",counter);
 					//counter++;
 					main_window_array[2] -> ShowWindow();
+					button_array[13] -> DrawText();
+					button_array[14] -> DrawText();
 					time_panel_array[1] -> Start();
+					progress_bar_array[0] -> Draw();
+					time_panel_array[1] -> Draw();
 					status = pthread_create(&t1,NULL,apb -> ProducerWrite,t_struct);
 					if (status != 0){
 						fprintf(stderr,"Crate producer thread error: %s\n",strerror(status));
@@ -712,23 +715,25 @@ int main(int argc,char *argv[])
 					if (status != 0){
 						fprintf(stderr,"Join to producer thread error: %s\n",strerror(status));
 						exit(EXIT_FAILURE);
-					}
-					status = pthread_join(t2,NULL);
-					if (status != 0){
-						fprintf(stderr,"Join to consumer thread error: %s\n",strerror(status));
-						exit(EXIT_FAILURE);
+					} else {
+						/* kill thread for drawing */
+						fprintf(stderr,"Now cancel the other thread\n");
+						pthread_cancel(t2);
 					}
 					//apb -> PlayNoise();
 				}
 				if (event.xbutton.window == button_array[8] -> GetWindow()){
 					apb -> PlayVoice();
 				}
+				/* Sine wave playback */
 				if (event.xbutton.window == button_array[1] -> GetWindow()){
-					//progress_bar_array[0] -> ResetBar();
-					//progress_bar_array[0] -> Draw();
-					//apb -> ResetTimer();
-					//counter = 1;
+					apb -> PlaySine();
 					main_window_array[2] -> ShowWindow();
+					button_array[13] -> DrawText();
+					button_array[14] -> DrawText();
+					progress_bar_array[0] -> Draw();
+					time_panel_array[1] -> Start();
+					time_panel_array[1] -> Draw();
 					status = pthread_create(&t1,NULL,apb -> ProducerWrite,t_struct);
 					if (status != 0){
 						fprintf(stderr,"Crate producer thread error: %s\n",strerror(status));
@@ -743,13 +748,11 @@ int main(int argc,char *argv[])
 					if (status != 0){
 						fprintf(stderr,"Join to producer thread error: %s\n",strerror(status));
 						exit(EXIT_FAILURE);
+					} else {
+						/* kill thread for drawing */
+						fprintf(stderr,"Now cancel the other thread\n");
+						pthread_cancel(t2);
 					}
-					status = pthread_join(t2,NULL);
-					if (status != 0){
-						fprintf(stderr,"Join to consumer thread error: %s\n",strerror(status));
-						exit(EXIT_FAILURE);
-					}
-					//apb -> PlaySine();
 				}
 				if (event.xbutton.window == button_array[9] -> GetWindow()){
 					
@@ -828,7 +831,9 @@ int main(int argc,char *argv[])
 					apb -> ResetTimer();
 					time_panel_array[1] -> Stop();
 					time_panel_array[1] -> SetTopValue(time);
+					progress_bar_array[0] -> ResetBar();
 					time_panel_array[1] -> Draw();
+					progress_bar_array[0] -> Draw();
 				
 				}
 				break;

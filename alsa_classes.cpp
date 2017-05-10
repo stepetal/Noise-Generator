@@ -93,63 +93,47 @@ void AlsaStream::ShmInit()
 void AlsaStream::SemaphoresInit()
 {
 	pthread_mutex_init(&mutex,NULL);
-	sem_init(&full,0,0);
-	sem_init(&empty,0,period_size);
-	sem_init(&mutex_sem,0,1);
+	sem_init(&full,0,0);/* full semaphore is 0 therefore producer makes values first */
+	sem_init(&empty,0,1);
 }
+
 /* methods of AlsaPlayback class */
 
 void *AlsaPlayback::ConsumerRead(void *params)
 {
-	fprintf(stderr,"From consumer thread start procedure\n");
 	thread_struct *t_struct_c = (thread_struct *)params;
 	t_struct_c -> apb_s -> PlotNoise();
-	fprintf(stderr,"Noise has been plotted\n");
 }
 
 
 void AlsaPlayback::PlotNoise()
 {
-	int i;
-	int tmp;
 	int loops_c;
 	short int *ptr_thread;
-	int sem_val1;
-	int sem_val2;
 	loops_c = time_us / period_size;
-	//fprintf(stderr,"time_us: %i\n",time_us);
-	//fprintf(stderr,"period_size: %i\n",period_size);
-	//fprintf(stderr,"loops_c: %i\n",loops_c);
-	while (loops_c){
-		loops_c--;
-		//	sem_getvalue(&full,&sem_val1);
-		//	fprintf(stderr,"full cons : %i\n",sem_val1);
-		//	sem_getvalue(&empty,&sem_val2);
-		//	fprintf(stderr,"empty cons: %i\n",sem_val2);
-		sem_wait(&full);
-		//sem_wait(&mutex_sem);
-		pthread_mutex_lock(&mutex);
-		if(loops_c % 3  == 0){
-		XLockDisplay(canvas -> GetDisplay());
-		canvas -> ClearCanvas();
-		ptr_thread = base_shm;
-		canvas -> PlotArray(ptr_thread);
-		XUnlockDisplay(canvas -> GetDisplay());
+	if (canvas != NULL){
+		while (loops_c){
+			loops_c--;
+			sem_wait(&full);/* wait until full will be 1 */
+			pthread_mutex_lock(&mutex);/* for mutual exclusion */
+			/* Draw every third period. In other case problems with sound occur */
+			if(loops_c % 6  == 0){
+				XLockDisplay(canvas -> GetDisplay());/* preventive measures */
+				canvas -> ClearCanvas();
+				ptr_thread = base_shm;
+				canvas -> PlotArray(ptr_thread);
+ 				XUnlockDisplay(canvas -> GetDisplay());
+			}
+			pthread_mutex_unlock(&mutex);
+			sem_post(&empty);/* increase empty on 1 */
 		}
-		//fprintf(stderr,"Plotting...\n");
-		//sem_post(&mutex_sem);
-		pthread_mutex_unlock(&mutex);
-		sem_post(&empty);
 	}
-
 }
 
 void *AlsaPlayback::ProducerWrite(void *params)
 {
-	fprintf(stderr,"From producer thread start procedure\n");
 	thread_struct *t_struct_p = (thread_struct *)params;
 	t_struct_p -> apb_s -> PlayNoise();
-	fprintf(stderr,"Noise has been generated\n");
 }
 
 
@@ -201,15 +185,11 @@ void AlsaPlayback::PlaySine()
 
 void AlsaPlayback::PlayUsualNoiseOrSine()
 {
-	pid_t pid;
-	int return_status;
 	int i;
 	/* number of playback cycles per second */
 	int loops_ps;
 	/* for sinewave generator */
 	double phase = 0;
-	/* for semaphores */
-	int sem_val1,sem_val2;
 	/* open default pcm device for playback */
 	ret_code = snd_pcm_open(&pcm_handle,"default",SND_PCM_STREAM_PLAYBACK,0);
 	srand(time(NULL));
@@ -220,21 +200,14 @@ void AlsaPlayback::PlayUsualNoiseOrSine()
 	set_hw_params();
 	loops = time_us / period_time;
 	loops_ps = 1000000 / period_time;
-	loops_copy = loops;
 	while (loops > 0){
 		loops--;
-		//canvas -> ClearCanvas();
-		
-		/*
-		for (i = 0;i < period_size;i++){
-			playback_buffer[i] = rand()%65535;
-		}
-		*/
-		//ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
 		if (!(play_sine)){
-			sem_wait(&empty);
-		//	sem_wait(&mutex_sem);
+			sem_wait(&empty);/* firstly empty semaphore is 1 therefore producer can 
+							    generate period_size items
+							  */
 			pthread_mutex_lock(&mutex);
+			/* Change value of progress bar and timer panel every second */
 			if( (!(loops % loops_ps)) && (loops != 0)){
 				if (progress_bar != NULL){
 					progress_bar -> CheckForIncrease(counter);
@@ -243,44 +216,76 @@ void AlsaPlayback::PlayUsualNoiseOrSine()
 				if (time_panel != NULL){
 					time_panel -> RenewCounter(counter);	
 					time_panel -> Draw();
-					(counter)++;
 				}
+				if (button_close != NULL){
+					button_close -> ButtonReleasedState();
+					button_close -> DrawText();
+				}
+				if (button_reset != NULL){
+					button_reset -> ButtonReleasedState();
+					button_reset -> DrawText();
+				}
+				counter++;
 			}
 			GenerateNoise();
 			pthread_mutex_unlock(&mutex);
-		//	sem_post(&mutex_sem);
 			sem_post(&full);
-			//fprintf(stderr,"Loop : %i\n",loops);
-			//sem_getvalue(&full,&sem_val1);
-			//fprintf(stderr,"full : %i\n",sem_val1);
-			//sem_getvalue(&empty,&sem_val2);
-			//fprintf(stderr,"empty : %i\n",sem_val2);
-			ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
-		
-			if (ret_code == -EPIPE){
-				snd_pcm_prepare(pcm_handle);
-			} else if (ret_code < 0){
-				fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
-			} else if (ret_code != (int)frames){
-				fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
-			}
 		} else {
 			sem_wait(&empty);
 			pthread_mutex_lock(&mutex);
+			/* Change value of progress bar and timer panel every second */
+			if( (!(loops % loops_ps)) && (loops != 0)){
+				if (progress_bar != NULL){
+					progress_bar -> CheckForIncrease(counter);
+					progress_bar -> Draw();
+				}
+				if (time_panel != NULL){
+					time_panel -> RenewCounter(counter);	
+					time_panel -> Draw();
+				}
+				if (button_close != NULL){
+					button_close -> ButtonReleasedState();
+					button_close -> DrawText();
+				}
+				if (button_reset != NULL){
+					button_reset -> ButtonReleasedState();
+					button_reset -> DrawText();
+				}
+				counter++;
+			}
 			GenerateSine(&phase);
 			pthread_mutex_unlock(&mutex);
 			sem_post(&full);
 		}
-		//canvas -> PlotArray(base_shm);
-		//canvas -> ClearCanvas();
+		ret_code = snd_pcm_writei(pcm_handle,playback_buffer,frames);
+		if (ret_code == -EPIPE){
+			snd_pcm_prepare(pcm_handle);
+		} else if (ret_code < 0){
+			fprintf(stderr,"error from writei: %s\n",snd_strerror(ret_code));
+		} else if (ret_code != (int)frames){
+			fprintf(stderr,"short write: must be writeen %i, wrote %i\n",(int)frames,ret_code);
+		}
 	}
-	if (play_sine)
+	if (play_sine){
 		play_sine = 0;
-	sem_post(&full);
+	}
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
 	free(playback_buffer);
 	free(capture_buffer);
+	if (time_panel != NULL){
+		time_panel -> Stop();
+		time_panel -> SetTopValue(time_us / 1000000);
+		time_panel -> Draw();
+	}
+	if (progress_bar != NULL){
+		progress_bar -> ResetBar();
+		progress_bar -> Draw();
+	}
+	if (canvas != NULL){
+		canvas -> ClearCanvas();
+	}
+	ResetTimer();
 	sleep(5);/* delay before next sound playback */
 }
 
