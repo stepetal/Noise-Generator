@@ -1,6 +1,13 @@
 /* x11_classes.cpp
  *
- * Implementation of widgets in x11
+ * Description: 	Program for noise and sinewave generation.
+ *					Alsa library for sound and Xlib for graphics programing are used
+ * Sources: 		1) "Introduction to sound programming with ALSA", Jeff Tranter
+ *					2) Nairobi-embedded.org. ALSA and Common-off-the-shelf H/W Infrastructure
+ *			   						 		 for DSP
+ *					3) "Fundamentals of Xlib programming by Examples", Ross Maloney
+ * Author: 			Alexandr Stpanov
+ * Date: 			11.05.2017
  *
  */
 
@@ -23,9 +30,10 @@ void AbstractWindow::SetWindowColor(char const *color_name)
 {
 	XParseColor(display,wind_colormap,(char *)color_name,&wind_color);
 	XAllocColor(display,wind_colormap,&wind_color);
-	valuemask = GCForeground | GCLineWidth;
+	valuemask = GCForeground | GCLineWidth | GCBackground;
 	wind_gc_values.line_width = 2;
 	wind_gc_values.foreground = wind_color.pixel;
+	wind_gc_values.background = BlackPixel(display,screen_number);
 	wind_gc = XCreateGC(display,cur_window,valuemask,&wind_gc_values);
 }
 
@@ -203,6 +211,23 @@ void Panel::DrawText(int x_p,int y_p)
 	wind_text_item.chars = caption_text;
 	wind_text_item.nchars = strlen(caption_text);
 	XDrawText(display,cur_window,wind_gc,x_p,y_p,&wind_text_item,1);
+}
+
+void Panel::DrawImage(const char *name)
+{
+	int rc;
+	unsigned int bitmap_width;
+	unsigned int bitmap_height;
+	int x_hot;
+	int y_hot;
+	Pixmap picture;
+	SetWindowColor("white");
+	XReadBitmapFile(display,cur_window,(char *)name,
+					&bitmap_width,&bitmap_height,
+					&picture,&x_hot,&y_hot);
+	XCopyPlane(display,picture,cur_window,wind_gc,
+			   0,0,bitmap_width,bitmap_height,0,height/4,1);
+	SetWindowColor("black");
 }
 
 /* methods of CheckBox class */

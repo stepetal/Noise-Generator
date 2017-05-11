@@ -1,6 +1,13 @@
 /* alsa_classes.cpp
  *
- * This program allows to capture and playback alsa stream
+ * Description: 	Program for noise and sinewave generation.
+ *					Alsa library for sound and Xlib for graphics programing are used
+ * Sources: 		1) "Introduction to sound programming with ALSA", Jeff Tranter
+ *					2) Nairobi-embedded.org. ALSA and Common-off-the-shelf H/W Infrastructure
+ *			   						 		 for DSP
+ *					3) "Fundamentals of Xlib programming by Examples", Ross Maloney
+ * Author: 			Alexandr Stpanov
+ * Date: 			11.05.2017
  *
  */
 

@@ -1,6 +1,13 @@
 /* x11_classes.h
  *
- * Implementation of widgets in x11
+ * Description: 	Program for noise and sinewave generation.
+ *					Alsa library for sound and Xlib for graphics programing are used
+ * Sources: 		1) "Introduction to sound programming with ALSA", Jeff Tranter
+ *					2) Nairobi-embedded.org. ALSA and Common-off-the-shelf H/W Infrastructure
+ *			   						 		 for DSP
+ *					3) "Fundamentals of Xlib programming by Examples", Ross Maloney
+ * Author: 			Alexandr Stpanov
+ * Date: 			11.05.2017
  *
  */
 
@@ -105,6 +112,7 @@ class Panel : public AbstractWindow{
 			  unsigned int border_width_p);
 		void SetText(char const *capt_text);/* set panel caption text */
 		void DrawText(int x_p,int y_p);
+		void DrawImage(const char *name);/* draw bitmap file */
 };
 
 class CheckBox : public AbstractWindow{

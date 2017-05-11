@@ -1,6 +1,13 @@
 /* main.cpp
  *
- * Implementation of widgets in x11
+ * Description: 	Program for noise and sinewave generation.
+ *					Alsa library for sound and Xlib for graphics programing are used
+ * Sources: 		1) "Introduction to sound programming with ALSA", Jeff Tranter
+ *					2) Nairobi-embedded.org. ALSA and Common-off-the-shelf H/W Infrastructure
+ *			   						 		 for DSP
+ *					3) "Fundamentals of Xlib programming by Examples", Ross Maloney
+ * Author: 			Alexandr Stpanov
+ * Date: 			11.05.2017
  * 
  */
 
@@ -16,8 +23,8 @@
 
 /* constants for MainWindow */
 #define MAIN_WINDOW_NUMBER				3	/* number of MainWindows */
-#define MAIN_WINDOW_WIDTH				650
-#define MAIN_WINDOW_HEIGHT				530
+#define MAIN_WINDOW_WIDTH				500
+#define MAIN_WINDOW_HEIGHT				490
 
 /* constants for big Panels */
 #define BIG_PANEL_NUMBER 				9	/* number of big Panels */	
@@ -123,6 +130,7 @@ int main(int argc,char *argv[])
 	char const *descr_str2 = "was created by:";
 	char const *descr_str3 = "Alexandr Stepanov";
 	char const *descr_str4 = "stepetal94@rambler.ru";
+	char const *bitmap_file_name = "noise_gen.bitmap";
 	/* object definition */
 	/* for GUI */
 	Panel *big_panel_array[BIG_PANEL_NUMBER];
@@ -171,7 +179,7 @@ int main(int argc,char *argv[])
 	/* for MainWindows */
 	int main_window_x_array[MAIN_WINDOW_NUMBER] = {50,100,150};
 	int main_window_y_array[MAIN_WINDOW_NUMBER] = {50,100,100};
-	char const *main_window_titles[MAIN_WINDOW_NUMBER] = {"Window","About","Canvas"};
+	char const *main_window_titles[MAIN_WINDOW_NUMBER] = {"Noise Generator","About","Canvas"};
 	/* for EditBox */
 	int edit_box_x_array[EDIT_BOX_NUMBER] = {10};
 	int edit_box_y_array[EDIT_BOX_NUMBER] = {20};
@@ -512,6 +520,9 @@ int main(int argc,char *argv[])
 					if (i == 4){
 						big_panel_text_y = big_panel_array[i] -> GetHeight()/9 + 8;
 						big_panel_text_x = big_panel_array[i] -> GetWidth()/5 + 10;
+					}
+					if (i == 8){
+						big_panel_array[i] -> DrawImage(bitmap_file_name);
 					}
 					big_panel_array[i] -> DrawText(big_panel_text_x,big_panel_text_y);
 				}
