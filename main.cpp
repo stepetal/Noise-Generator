@@ -12,6 +12,7 @@
 #define VOICE_LIKE_NOISE				0
 #define TIME_DOMAIN						1
 #define FREQUENCY_DOMAIN				0
+#define ALSA_PERIOD_FRAMES				128
 
 /* constants for MainWindow */
 #define MAIN_WINDOW_NUMBER				3	/* number of MainWindows */
@@ -85,8 +86,6 @@ int main(int argc,char *argv[])
 	char ch;/* char form keyboard */
 	KeySym key_sym;/* KeySym for key */
 	bool done = false;/* condition for ending cycle */
-	int number_of_clicks = 120;
-	int counter = 1;
 	XEvent event;/* event to be catched */
 	int freq_array[4] = {344,440,688,700};/* available sine frequences */
 	int time_array[3] = {5,10,20};/* available recording and playback time */
@@ -95,7 +94,7 @@ int main(int argc,char *argv[])
 	int sine_freq = freq_array[3];
 	int time = time_array[1];
 	/* alsa data for plotting */
-	int frames = 128 * 2;/* 2 bytes per one frame */
+	int period_size = ALSA_PERIOD_FRAMES * 2;/* 2 bytes per one frame */
 	int frame_length = 32765;/* max value for short int */
 	/* for multithreading */
 	pthread_t t1,t2;
@@ -120,7 +119,10 @@ int main(int argc,char *argv[])
 	char const *canvas_color = "white smoke";
 	char const *font_name = "lucidasanstypewriter-10";
 	char const *font_color_name = "black";
-	char const *text = "Text in main window";
+	char const *descr_str1 = "This program";
+	char const *descr_str2 = "was created by:";
+	char const *descr_str3 = "Alexandr Stepanov";
+	char const *descr_str4 = "stepetal94@rambler.ru";
 	/* object definition */
 	/* for GUI */
 	Panel *big_panel_array[BIG_PANEL_NUMBER];
@@ -428,7 +430,7 @@ int main(int argc,char *argv[])
 									 display,screen_number,
 									 CANVAS_BORDER_WIDTH,
 									 font_name,font_color_name);			
-		canvas_array[i] -> SetArrayValues(frames,frame_length);
+		canvas_array[i] -> SetArrayValues(period_size,frame_length);
 		canvas_array[i] -> ShowWindow();
 	}
 	/* Hide some windows */
@@ -479,7 +481,13 @@ int main(int argc,char *argv[])
 		switch(event.type){
 			case Expose:
 				for (i = 0;i < MAIN_WINDOW_NUMBER;i++){
-					main_window_array[i] -> DrawText(text);
+					if (i == 1){
+						main_window_array[i] -> DrawText(descr_str1,0);
+						main_window_array[i] -> DrawText(descr_str2,1);
+						main_window_array[i] -> DrawText(descr_str3,2);
+						main_window_array[i] -> DrawText(descr_str4,3);
+					}
+				
 				}
 				for (i = 0;i < BUTTON_NUMBER;i++){
 					button_array[i] -> ButtonReleasedState();

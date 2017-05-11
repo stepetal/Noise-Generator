@@ -13,7 +13,7 @@ AlsaStream::AlsaStream()
 	hw_params = NULL;
 	numb_of_channels = 1;
 	rate = 44100;
-	frames = 128;
+	frames = PERIOD_FRAMES;
 	time_us = 5000000;
 	dir = 0;
 	ret_code = 0;
@@ -144,7 +144,7 @@ void *AlsaPlayback::ProducerWrite(void *params)
 
 void AlsaPlayback::PlayNoise()
 {
-	if(noise_type){
+	if(noise_type || play_sine){
 		PlayUsualNoiseOrSine();
 	} else {
 		fprintf(stderr,"Play voice-like noise\n");
@@ -350,6 +350,7 @@ void AlsaPlayback::PlayVoice()
 	fclose(voice_file);
 	free(playback_buffer);
 	free(capture_buffer);
+	ResetTimer();
 	sleep(5);/* delay before next sound playback */
 }
 
@@ -379,7 +380,7 @@ void  AlsaPlayback::PlayVoiceLikeNoise()
 		loops--;
 
 		if(!feof(voice_like_noise_file)){
-			fread(playback_buffer,1,period_size,voice_like_noise_file);
+			fread(playback_buffer,2,period_size,voice_like_noise_file);
 			sem_wait(&empty);/* firstly empty semaphore is 1 therefore producer can 
 							    generate period_size items
 							  */
@@ -434,6 +435,7 @@ void  AlsaPlayback::PlayVoiceLikeNoise()
 	if (canvas != NULL){
 		canvas -> ClearCanvas();
 	}
+	ResetTimer();
 	sleep(5);/* delay before next sound playback */
 }
 
@@ -508,9 +510,10 @@ void AlsaCapture::CaptureVoice()
 			//ptr_shm[i] = tmp3;
 			playback_buffer[i] = tmp3;
 		}
-		fwrite(playback_buffer,1,period_size,voice_like_noise_file);
-		fwrite(capture_buffer,1,period_size,voice_file);
+		fwrite(playback_buffer,2,period_size,voice_like_noise_file);
+		fwrite(capture_buffer,2,period_size,voice_file);
 	}
+	ResetTimer();
 	snd_pcm_drain(pcm_handle);
 	snd_pcm_close(pcm_handle);
 	fclose(voice_file);

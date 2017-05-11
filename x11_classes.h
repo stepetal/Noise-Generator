@@ -74,7 +74,7 @@ class MainWindow : public AbstractWindow{
 				   char const *font_name,char const *font_color_name,
 				   Display *display_p,int screen_number_p);
 		Display* GetDisplay(){ return display; }
-		void DrawText(char const *text);
+		void DrawText(char const *text,int str_order_numb);
 };
 
 class Button : public AbstractWindow{

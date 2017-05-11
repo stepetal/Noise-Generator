@@ -99,11 +99,11 @@ MainWindow::MainWindow(unsigned int width_p,unsigned int height_p,
 }
 
 
-void MainWindow::DrawText(char const *text)
+void MainWindow::DrawText(char const *text,int str_order_numb)
 {
 	wind_text_item.chars = (char *)text;
 	wind_text_item.nchars = strlen((char *)text);
-	XDrawText(display,cur_window,wind_gc,30,30,&wind_text_item,1);
+	XDrawText(display,cur_window,wind_gc,30,30 + 13 * str_order_numb,&wind_text_item,1);
 }
 
 

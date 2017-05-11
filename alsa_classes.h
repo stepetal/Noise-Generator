@@ -16,7 +16,9 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <unistd.h>
-//#include "x11_classes.h"/* for compilation without noise_gen program */
+//#include "x11_classes.h"/* for compilation without noise_gen_gui program */
+
+#define PERIOD_FRAMES	128	
 
 
 
